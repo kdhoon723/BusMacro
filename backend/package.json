@@ -1,0 +1,32 @@
+{
+  "name": "busmacro-backend",
+  "version": "1.0.0",
+  "description": "대진대 버스 예약 자동화 매크로 백엔드",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test:login": "node src/test/login-test.js",
+    "test:reserve": "node src/test/reserve-test.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "puppeteer",
+    "automation",
+    "bus",
+    "reservation"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.9.0",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "firebase-admin": "^13.4.0",
+    "node-cron": "^4.0.5",
+    "puppeteer": "^24.8.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
