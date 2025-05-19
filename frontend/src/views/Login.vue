@@ -20,6 +20,7 @@
             v-model="studentId" 
             placeholder="학번을 입력하세요"
             required
+            class="form-input"
           />
         </div>
         
@@ -32,6 +33,7 @@
             v-model="password" 
             placeholder="비밀번호를 입력하세요"
             required
+            class="form-input"
           />
         </div>
         
@@ -97,6 +99,7 @@ const handleLogin = async () => {
   min-height: 100vh;
   padding: 20px;
   background-color: var(--light-color);
+  font-family: 'Noto Sans KR', sans-serif;
 }
 
 .login-card {
@@ -113,6 +116,7 @@ const handleLogin = async () => {
   margin: 0 0 10px 0;
   font-size: 1.8rem;
   text-align: center;
+  font-weight: 700;
 }
 
 .login-subtitle {
@@ -132,29 +136,36 @@ const handleLogin = async () => {
 
 .form-group label {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
   font-weight: bold;
   color: var(--dark-color);
 }
 
-.form-group input {
+.form-input {
   width: 100%;
   padding: 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 16px;
   box-sizing: border-box;
-  transition: border-color 0.3s;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  font-family: 'Noto Sans KR', sans-serif;
 }
 
-.form-group input:focus {
+.form-input:focus {
   border-color: var(--primary-color);
   outline: none;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.form-input::placeholder {
+  color: #aaa;
+  font-family: 'Noto Sans KR', sans-serif;
 }
 
 .btn-login {
   width: 100%;
-  padding: 12px;
+  padding: 14px;
   background-color: var(--primary-color);
   color: white;
   border: none;
@@ -163,6 +174,7 @@ const handleLogin = async () => {
   font-weight: bold;
   cursor: pointer;
   transition: background-color 0.3s;
+  font-family: 'Noto Sans KR', sans-serif;
 }
 
 .btn-login:hover {
@@ -178,6 +190,7 @@ const handleLogin = async () => {
   padding: 12px;
   border-radius: 4px;
   margin-bottom: 20px;
+  font-weight: 500;
 }
 
 .alert-error {
@@ -194,7 +207,8 @@ const handleLogin = async () => {
 }
 
 .login-info p {
-  margin: 5px 0;
-  font-size: 0.9rem;
+  margin: 8px 0;
+  font-size: 0.95rem;
+  color: var(--dark-color);
 }
 </style> 

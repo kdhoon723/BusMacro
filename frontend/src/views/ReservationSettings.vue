@@ -42,6 +42,7 @@
               id="to-route" 
               v-model="currentSettings.toSchool.route" 
               :disabled="!currentSettings.toSchool.enabled"
+              class="form-select"
             >
               <option value="" disabled>노선을 선택하세요</option>
               <option v-for="route in toSchoolRoutes" :key="route.id" :value="route.name">
@@ -56,6 +57,7 @@
               id="to-time" 
               v-model="currentSettings.toSchool.time" 
               :disabled="!currentSettings.toSchool.enabled"
+              class="form-select"
             >
               <option value="" disabled>시간을 선택하세요</option>
               <option v-for="time in toSchoolTimes" :key="time" :value="time">{{ time }}</option>
@@ -68,6 +70,7 @@
               id="to-station" 
               v-model="currentSettings.toSchool.station" 
               :disabled="!currentSettings.toSchool.enabled"
+              class="form-select"
             >
               <option value="" disabled>정류장을 선택하세요</option>
               <option v-for="station in toSchoolStations" :key="station" :value="station">{{ station }}</option>
@@ -83,6 +86,7 @@
               min="1" 
               max="45" 
               :disabled="!currentSettings.toSchool.enabled"
+              class="form-input"
             >
             <p class="form-hint">※ 선호 좌석을 사용할 수 없는 경우 자동으로 다른 좌석을 선택합니다.</p>
           </div>
@@ -106,6 +110,7 @@
               id="from-route" 
               v-model="currentSettings.fromSchool.route" 
               :disabled="!currentSettings.fromSchool.enabled"
+              class="form-select"
             >
               <option value="" disabled>노선을 선택하세요</option>
               <option v-for="route in fromSchoolRoutes" :key="route.id" :value="route.name">
@@ -120,6 +125,7 @@
               id="from-time" 
               v-model="currentSettings.fromSchool.time" 
               :disabled="!currentSettings.fromSchool.enabled"
+              class="form-select"
             >
               <option value="" disabled>시간을 선택하세요</option>
               <option v-for="time in fromSchoolTimes" :key="time" :value="time">{{ time }}</option>
@@ -132,6 +138,7 @@
               id="from-station" 
               v-model="currentSettings.fromSchool.station" 
               :disabled="!currentSettings.fromSchool.enabled"
+              class="form-select"
             >
               <option value="" disabled>정류장을 선택하세요</option>
               <option v-for="station in fromSchoolStations" :key="station" :value="station">{{ station }}</option>
@@ -147,6 +154,7 @@
               min="1" 
               max="45" 
               :disabled="!currentSettings.fromSchool.enabled"
+              class="form-input"
             >
             <p class="form-hint">※ 선호 좌석을 사용할 수 없는 경우 자동으로 다른 좌석을 선택합니다.</p>
           </div>
@@ -345,18 +353,22 @@ async function saveSettings() {
 <style scoped>
 .settings-container {
   padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .settings-title {
   color: var(--dark-color);
   margin-bottom: 30px;
   font-size: 2rem;
+  text-align: center;
 }
 
 .settings-tabs {
   display: flex;
   gap: 10px;
   margin-bottom: 20px;
+  justify-content: center;
 }
 
 .tab-button {
@@ -466,28 +478,39 @@ input:checked + .slider:before {
 
 .form-group label {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
   font-weight: bold;
 }
 
-.form-group select,
-.form-group input {
+.form-select,
+.form-input {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 16px;
   background-color: white;
+  color: var(--text-color);
+  font-family: 'Noto Sans KR', sans-serif;
+  appearance: auto;
 }
 
-.form-group select:focus,
-.form-group input:focus {
+.form-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+
+.form-select:focus,
+.form-input:focus {
   border-color: var(--primary-color);
   outline: none;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
 }
 
-.form-group select[disabled],
-.form-group input[disabled] {
+.form-select[disabled],
+.form-input[disabled] {
   background-color: #f9f9f9;
   color: #999;
   cursor: not-allowed;
@@ -495,7 +518,7 @@ input:checked + .slider:before {
 
 .form-hint {
   margin-top: 5px;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: #666;
 }
 
@@ -509,12 +532,13 @@ input:checked + .slider:before {
 
 .btn-save,
 .btn-reset {
-  padding: 10px 20px;
+  padding: 12px 24px;
   border-radius: 4px;
   font-weight: bold;
   cursor: pointer;
   border: none;
   transition: background-color 0.3s;
+  font-family: 'Noto Sans KR', sans-serif;
 }
 
 .btn-save {

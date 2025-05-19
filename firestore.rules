@@ -2,8 +2,37 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // 기본 규칙: 인증되지 않은 사용자는 접근 불가
     match /{document=**} {
       allow read, write: if false;
+    }
+    
+    // 스케줄 설정: 인증된 사용자는 읽기/쓰기 가능
+    match /schedules/{day} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 로그: 인증된 사용자는 읽기만 가능
+    match /logs/{logId} {
+      allow read: if request.auth != null;
+      allow write: if false; // 로그는 백엔드에서만 작성
+    }
+    
+    // 사용자 설정: 자신의 설정만 읽기/쓰기 가능
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // 시스템 상태: 인증된 사용자는 읽기만 가능
+    match /systemStatus/{document} {
+      allow read: if request.auth != null;
+      allow write: if false; // 시스템 상태는 백엔드에서만 수정
+    }
+    
+    // 예약 설정: 인증된 사용자는 읽기/쓰기 가능
+    match /reservationSettings/{document} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
   }
 }
