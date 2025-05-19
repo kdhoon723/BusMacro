@@ -27,6 +27,7 @@ firestore-debug.log
 ui-debug.log
 *-service-account.json
 .runtimeconfig.json
+.firebaserc
 
 # 에디터 디렉토리 및 파일
 .idea/
