@@ -8,6 +8,7 @@
     "dev": "nodemon src/index.js",
     "test:login": "node src/test/login-test.js",
     "test:reserve": "node src/test/reserve-test.js",
+    "reserve:wait9pm": "node src/test/wait-and-reserve.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

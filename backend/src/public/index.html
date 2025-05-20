@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>대진대학교 버스 예약 매크로 모니터링</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background-color: #f8f9fa;
+    }
+    .container {
+      max-width: 1200px;
+      padding: 20px;
+    }
+    .card {
+      margin-bottom: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .screenshot-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    .screenshot-item {
+      width: 300px;
+      margin-bottom: 15px;
+    }
+    .screenshot-img {
+      width: 100%;
+      border-radius: 5px;
+      border: 1px solid #dee2e6;
+      cursor: pointer;
+    }
+    .modal-img {
+      max-width: 100%;
+    }
+    .status-badge {
+      font-size: 1rem;
+      padding: 0.5rem 1rem;
+    }
+    .action-btn {
+      margin-right: 10px;
+    }
+    .refresh-btn {
+      cursor: pointer;
+    }
+    #countdown {
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="mt-4 mb-4 text-center">대진대학교 버스 예약 매크로 모니터링</h1>
+    
+    <div class="row">
+      <!-- 상태 정보 -->
+      <div class="col-lg-6 mb-4">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">시스템 상태</h5>
+            <i class="bi bi-arrow-clockwise refresh-btn" onclick="refreshStatus()">🔄</i>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <span class="fw-bold">현재 상태:</span>
+              <span id="current-status" class="badge bg-primary status-badge ms-2">확인 중...</span>
+            </div>
+            <div class="mb-3">
+              <span class="fw-bold">서버 시간:</span>
+              <span id="server-time" class="ms-2">확인 중...</span>
+            </div>
+            <div class="mb-3">
+              <span class="fw-bold">다음 예약:</span>
+              <span id="next-schedule" class="ms-2">확인 중...</span>
+            </div>
+            <div class="mb-3">
+              <span class="fw-bold">카운트다운:</span>
+              <span id="countdown" class="ms-2">--:--:--</span>
+            </div>
+          </div>
+          <div class="card-footer d-flex justify-content-end">
+            <button class="btn btn-primary me-2" onclick="manualLogin()">수동 로그인</button>
+            <button class="btn btn-danger" onclick="manualReserve()">수동 예약 실행</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 최신 스크린샷 -->
+      <div class="col-lg-6 mb-4">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">최신 스크린샷</h5>
+            <i class="bi bi-arrow-clockwise refresh-btn" onclick="loadScreenshots()">🔄</i>
+          </div>
+          <div class="card-body">
+            <div id="latest-screenshot">
+              <p class="text-center">로딩 중...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 모든 스크린샷 -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">모든 스크린샷</h5>
+      </div>
+      <div class="card-body">
+        <div id="screenshots-container" class="screenshot-container">
+          <p class="text-center w-100">로딩 중...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 스크린샷 모달 -->
+  <div class="modal fade" id="screenshotModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="screenshotModalLabel">스크린샷 보기</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body text-center">
+          <img id="modal-img" src="" alt="스크린샷" class="modal-img">
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    let screenshotModal;
+    let nextScheduleTime = null;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      screenshotModal = new bootstrap.Modal(document.getElementById('screenshotModal'));
+      
+      // 초기 데이터 로드
+      refreshStatus();
+      loadScreenshots();
+      
+      // 30초마다 자동 새로고침
+      setInterval(refreshStatus, 30000);
+      setInterval(loadScreenshots, 60000);
+      
+      // 1초마다 카운트다운 업데이트
+      setInterval(updateCountdown, 1000);
+    });
+    
+    function refreshStatus() {
+      fetch('/api/status')
+        .then(response => response.json())
+        .then(data => {
+          // 상태 표시
+          const statusElement = document.getElementById('current-status');
+          statusElement.textContent = getStatusText(data.status);
+          statusElement.className = `badge status-badge ms-2 ${getStatusClass(data.status)}`;
+          
+          // 서버 시간
+          document.getElementById('server-time').textContent = 
+            new Date(data.serverTime).toLocaleString('ko-KR');
+          
+          // 다음 예약
+          if (data.nextScheduled) {
+            const nextDate = new Date(data.nextScheduled.date);
+            document.getElementById('next-schedule').textContent = 
+              `${data.nextScheduled.day}요일 (${nextDate.toLocaleString('ko-KR')})`;
+            
+            nextScheduleTime = data.nextScheduled.timestamp;
+          } else {
+            document.getElementById('next-schedule').textContent = '스케줄 없음';
+          }
+        })
+        .catch(error => {
+          console.error('상태 정보 로드 오류:', error);
+        });
+    }
+    
+    function loadScreenshots() {
+      fetch('/api/screenshots')
+        .then(response => response.json())
+        .then(data => {
+          if (data.length === 0) {
+            document.getElementById('latest-screenshot').innerHTML = '<p class="text-center">스크린샷이 없습니다</p>';
+            document.getElementById('screenshots-container').innerHTML = '<p class="text-center w-100">스크린샷이 없습니다</p>';
+            return;
+          }
+          
+          // 최신 스크린샷
+          const latestScreenshot = data[0];
+          document.getElementById('latest-screenshot').innerHTML = `
+            <img src="${latestScreenshot.url}" alt="${latestScreenshot.filename}" 
+                 class="img-fluid screenshot-img" 
+                 onclick="showScreenshot('${latestScreenshot.url}', '${latestScreenshot.filename}')">
+            <p class="mt-2 text-center">
+              ${new Date(latestScreenshot.timestamp.replace(/-/g, ':')).toLocaleString('ko-KR')}
+              <br>
+              <small>${getScreenshotType(latestScreenshot.filename)}</small>
+            </p>
+          `;
+          
+          // 모든 스크린샷
+          const container = document.getElementById('screenshots-container');
+          container.innerHTML = data.map(screenshot => `
+            <div class="screenshot-item">
+              <img src="${screenshot.url}" alt="${screenshot.filename}" 
+                   class="screenshot-img" 
+                   onclick="showScreenshot('${screenshot.url}', '${screenshot.filename}')">
+              <p class="mt-1 mb-0 small text-center">
+                ${new Date(screenshot.timestamp.replace(/-/g, ':')).toLocaleString('ko-KR')}
+                <br>
+                <small>${getScreenshotType(screenshot.filename)}</small>
+              </p>
+            </div>
+          `).join('');
+        })
+        .catch(error => {
+          console.error('스크린샷 로드 오류:', error);
+        });
+    }
+    
+    function showScreenshot(url, filename) {
+      document.getElementById('modal-img').src = url;
+      document.getElementById('screenshotModalLabel').textContent = getScreenshotType(filename);
+      screenshotModal.show();
+    }
+    
+    function manualLogin() {
+      if (!confirm('수동으로 로그인을 시도하시겠습니까?')) return;
+      
+      fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      .then(response => response.json())
+      .then(data => {
+        alert(data.success ? '로그인 성공!' : `로그인 실패: ${data.error}`);
+        setTimeout(() => {
+          refreshStatus();
+          loadScreenshots();
+        }, 2000);
+      })
+      .catch(error => {
+        alert(`오류 발생: ${error.message}`);
+      });
+    }
+    
+    function manualReserve() {
+      if (!confirm('수동으로 예약을 실행하시겠습니까?')) return;
+      
+      fetch('/api/reserve/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      .then(response => response.json())
+      .then(data => {
+        alert(data.status === 'success' 
+          ? '예약 성공!' 
+          : `예약 실패: ${data.message || data.error}`);
+        setTimeout(() => {
+          refreshStatus();
+          loadScreenshots();
+        }, 2000);
+      })
+      .catch(error => {
+        alert(`오류 발생: ${error.message}`);
+      });
+    }
+    
+    function updateCountdown() {
+      if (!nextScheduleTime) return;
+      
+      const now = new Date().getTime();
+      const distance = nextScheduleTime - now;
+      
+      if (distance < 0) {
+        document.getElementById('countdown').textContent = '진행 중...';
+        return;
+      }
+      
+      const hours = Math.floor(distance / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+      
+      document.getElementById('countdown').textContent = 
+        `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+    
+    function getStatusText(status) {
+      const statusMap = {
+        'idle': '대기 중',
+        'preparing': '준비 중',
+        'waiting': '로그인 완료, 예약 대기 중',
+        'running': '예약 진행 중',
+        'error': '오류 발생'
+      };
+      return statusMap[status] || status;
+    }
+    
+    function getStatusClass(status) {
+      const classMap = {
+        'idle': 'bg-secondary',
+        'preparing': 'bg-info',
+        'waiting': 'bg-primary',
+        'running': 'bg-warning',
+        'error': 'bg-danger'
+      };
+      return classMap[status] || 'bg-secondary';
+    }
+    
+    function getScreenshotType(filename) {
+      const typeMap = {
+        'login-page': '로그인 페이지',
+        'login-confirm': '로그인 확인',
+        'main-page': '메인 페이지',
+        'login-error': '로그인 오류',
+        'fromSchool-tab': '하교 탭',
+        'fromSchool-before-reserve': '하교 예약 전',
+        'fromSchool-confirm-dialog': '하교 예약 확인',
+        'fromSchool-result': '하교 예약 결과',
+        'fromSchool-error': '하교 예약 오류',
+        'toSchool-tab': '등교 탭',
+        'toSchool-before-reserve': '등교 예약 전',
+        'toSchool-confirm-dialog': '등교 예약 확인',
+        'toSchool-result': '등교 예약 결과',
+        'toSchool-error': '등교 예약 오류'
+      };
+      
+      for (const [key, value] of Object.entries(typeMap)) {
+        if (filename.includes(key)) return value;
+      }
+      
+      return filename.split('_').pop().replace('.png', '');
+    }
+  </script>
+</body>
+</html> 

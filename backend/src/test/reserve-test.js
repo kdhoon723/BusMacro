@@ -33,10 +33,15 @@ const TEST_RESERVATION_DATA = {
 async function testReservation() {
   console.log('---------- 예약 프로세스 테스트 시작 ----------');
   
+  // 전체 테스트 과정 시간 측정 시작
+  busReservation.startTimer('전체 테스트 과정');
+  
   try {
     // 1. 로그인 테스트
     console.log('\n[1단계] 로그인 테스트');
+    busReservation.startTimer('로그인 테스트');
     await busReservation.login();
+    busReservation.endTimer('로그인 테스트');
     console.log('로그인 테스트 성공!\n');
     
     // 2. 예약 프로세스 테스트 (Firebase 데이터 대신 테스트 데이터 직접 사용)
@@ -53,7 +58,10 @@ async function testReservation() {
     
     try {
       // 전체 예약 프로세스 실행
+      busReservation.startTimer('예약 프로세스 실행');
       const result = await busReservation.startReservation();
+      busReservation.endTimer('예약 프로세스 실행');
+      
       console.log('\n예약 프로세스 테스트 결과:', result);
       console.log('예약 테스트 성공!');
     } finally {
@@ -64,11 +72,16 @@ async function testReservation() {
   } catch (error) {
     console.error('테스트 실패:', error);
   } finally {
+    busReservation.endTimer('전체 테스트 과정');
+    
+    // 모든 타이머 결과 출력
+    busReservation.reportTimers();
+    
     console.log('\n---------- 예약 프로세스 테스트 종료 ----------');
     
-    // 브라우저 종료를 위해 5초 대기 후 프로세스 종료
-    console.log('5초 후 프로세스가 종료됩니다...');
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    // 브라우저 종료를 위해 2초 대기 후 프로세스 종료
+    console.log('2초 후 프로세스가 종료됩니다...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
     process.exit(0);
   }
 }

@@ -1,0 +1,26 @@
+steps:
+# 도커 이미지 빌드
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/$PROJECT_ID/busmacro-backend', '.']
+
+# 도커 이미지 푸시
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/$PROJECT_ID/busmacro-backend']
+
+# Cloud Run 배포
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args:
+  - 'run'
+  - 'deploy'
+  - 'busmacro-backend'
+  - '--image'
+  - 'gcr.io/$PROJECT_ID/busmacro-backend'
+  - '--region'
+  - 'asia-northeast3'  # 서울 리전
+  - '--platform'
+  - 'managed'
+  - '--allow-unauthenticated'  # 공개 접근 허용 (필요시 제거)
+
+images:
+- 'gcr.io/$PROJECT_ID/busmacro-backend' 

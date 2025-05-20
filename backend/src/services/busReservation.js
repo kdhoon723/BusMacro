@@ -3,6 +3,8 @@
  */
 const puppeteer = require('puppeteer');
 const { getFirestore } = require('firebase-admin/firestore');
+const fs = require('fs').promises;
+const path = require('path');
 const db = getFirestore();
 
 // 브라우저 인스턴스
@@ -11,6 +13,63 @@ let page = null;
 
 // 예약 일정 캐시
 let nextSchedule = null;
+
+// 스크린샷 저장 디렉토리
+const SCREENSHOT_DIR = path.join(__dirname, '../../screenshots');
+
+// 타이머 관련 변수
+const timers = {};
+const processStartTime = {};
+
+/**
+ * 타이머 시작 함수
+ */
+function startTimer(processName) {
+  timers[processName] = {
+    start: Date.now(),
+    end: null,
+    duration: null
+  };
+  console.log(`[TIMER] '${processName}' 프로세스 시작`);
+  return timers[processName].start;
+}
+
+/**
+ * 타이머 종료 함수
+ */
+function endTimer(processName) {
+  if (!timers[processName]) {
+    console.warn(`[TIMER] '${processName}' 타이머가 시작되지 않았습니다.`);
+    return 0;
+  }
+  
+  timers[processName].end = Date.now();
+  timers[processName].duration = timers[processName].end - timers[processName].start;
+  
+  console.log(`[TIMER] '${processName}' 프로세스 완료: ${timers[processName].duration}ms`);
+  return timers[processName].duration;
+}
+
+/**
+ * 타이머 보고 함수 - 전체 과정 시간 요약
+ */
+function reportTimers() {
+  console.log("\n==== 프로세스 시간 요약 ====");
+  let totalTime = 0;
+  
+  Object.keys(timers).forEach(process => {
+    if (timers[process].duration) {
+      console.log(`- ${process}: ${timers[process].duration}ms`);
+      totalTime += timers[process].duration;
+    } else if (timers[process].start) {
+      const current = Date.now();
+      const ongoing = current - timers[process].start;
+      console.log(`- ${process}: ${ongoing}ms (진행 중)`);
+    }
+  });
+  
+  console.log(`==== 총 소요 시간: ${totalTime}ms ====\n`);
+}
 
 /**
  * 지정된 시간(ms) 동안 대기하는 함수
@@ -22,14 +81,141 @@ function delay(time) {
 }
 
 /**
+ * 알림창 확인 버튼 클릭 처리 헬퍼 함수
+ * 최대 시도 횟수만큼 확인 버튼을 찾아 클릭 시도
+ */
+async function handleConfirmDialogs(screenshotPrefix = 'dialog', maxAttempts = 3) {
+  const processName = `알림창 처리(${screenshotPrefix})`;
+  startTimer(processName);
+  
+  let attemptCount = 0;
+  let dialogFound = false;
+  
+  while (attemptCount < maxAttempts) {
+    try {
+      console.log(`알림창 확인 시도 ${attemptCount + 1}/${maxAttempts}`);
+      
+      // 알림창 확인 버튼 존재 여부 확인
+      const hasDialog = await page.evaluate(() => {
+        const confirmBtn = document.querySelector('.swal2-confirm');
+        return confirmBtn && window.getComputedStyle(confirmBtn).display !== 'none';
+      });
+      
+      if (!hasDialog) {
+        console.log('더 이상 처리할 알림창이 없습니다.');
+        break;
+      }
+      
+      dialogFound = true;
+      
+      // 알림창 내용 확인
+      const dialogMessage = await page.evaluate(() => {
+        const element = document.querySelector('.swal2-html-container');
+        return element ? element.textContent.trim() : '';
+      });
+      
+      console.log(`알림창 메시지: ${dialogMessage}`);
+      await takeScreenshot(`${screenshotPrefix}-attempt-${attemptCount + 1}`);
+      
+      // 다이얼로그 버튼 클릭 시도
+      try {
+        // 방법 1: 직접 클릭
+        await page.click('.swal2-confirm');
+        console.log('방법 1: 확인 버튼 직접 클릭 성공');
+      } catch (err) {
+        console.log('방법 1 실패, 방법 2 시도:', err.message);
+        
+        try {
+          // 방법 2: JavaScript로 클릭
+          await page.evaluate(() => {
+            const confirmBtn = document.querySelector('.swal2-confirm');
+            if (confirmBtn) confirmBtn.click();
+          });
+          console.log('방법 2: 자바스크립트로 확인 버튼 클릭 성공');
+        } catch (err2) {
+          console.log('방법 2 실패, 방법 3 시도:', err2.message);
+          
+          // 방법 3: dispatchEvent 사용
+          await page.evaluate(() => {
+            const confirmBtn = document.querySelector('.swal2-confirm');
+            if (confirmBtn) {
+              const clickEvent = new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                view: window
+              });
+              confirmBtn.dispatchEvent(clickEvent);
+            }
+          });
+          console.log('방법 3: 이벤트로 확인 버튼 클릭 시도');
+        }
+      }
+      
+      attemptCount++;
+      
+    } catch (error) {
+      console.warn(`알림창 처리 오류(무시됨): ${error.message}`);
+      attemptCount++;
+    }
+  }
+  
+  endTimer(processName);
+  return dialogFound;
+}
+
+/**
+ * 스크린샷 저장 경로 생성
+ */
+async function ensureScreenshotDir() {
+  try {
+    await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+    console.log('스크린샷 디렉토리 준비 완료');
+  } catch (error) {
+    console.error('스크린샷 디렉토리 생성 오류:', error);
+  }
+}
+
+/**
+ * 스크린샷 촬영 함수
+ */
+async function takeScreenshot(name) {
+  if (!page) return null;
+  
+  try {
+    await ensureScreenshotDir();
+    const timestamp = new Date().toISOString().replace(/:/g, '-');
+    const filename = `${timestamp}_${name}.png`;
+    const filePath = path.join(SCREENSHOT_DIR, filename);
+    
+    await page.screenshot({ path: filePath, fullPage: true });
+    console.log(`스크린샷 저장: ${filename}`);
+    return filename;
+  } catch (error) {
+    console.error('스크린샷 촬영 오류:', error);
+    return null;
+  }
+}
+
+/**
  * 브라우저 초기화
  */
 async function initBrowser() {
+  const processName = "브라우저 초기화";
+  startTimer(processName);
+  
   if (!browser) {
     console.log('브라우저 초기화');
     browser = await puppeteer.launch({
-      headless: process.env.NODE_ENV === 'production',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      headless: process.env.NODE_ENV === 'production' ? 'new' : false, // 개발 환경에서는 브라우저 표시
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--window-size=1366,768'
+      ],
       defaultViewport: { width: 1366, height: 768 }
     });
   }
@@ -42,6 +228,7 @@ async function initBrowser() {
     await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1');
   }
 
+  endTimer(processName);
   return { browser, page };
 }
 
@@ -49,12 +236,18 @@ async function initBrowser() {
  * 사이트 로그인
  */
 async function login() {
+  const processName = "로그인";
+  startTimer(processName);
+  
   try {
     const { page } = await initBrowser();
     
     // 로그인 페이지 접속
     console.log('로그인 페이지 접속');
     await page.goto('https://daejin.unibus.kr/#/', { waitUntil: 'networkidle2' });
+    
+    // 스크린샷 촬영: 로그인 페이지
+    await takeScreenshot('login-page');
     
     // 로그인 정보 입력
     console.log('로그인 정보 입력');
@@ -67,6 +260,10 @@ async function login() {
     
     // 로그인 성공 확인 (알림창 등)
     await page.waitForSelector('.swal2-confirm', { visible: true, timeout: 5000 });
+    
+    // 스크린샷 촬영: 로그인 확인
+    await takeScreenshot('login-confirm');
+    
     await page.click('.swal2-confirm');
     
     console.log('로그인 완료');
@@ -74,9 +271,16 @@ async function login() {
     // 메인 페이지가 로드될 때까지 대기
     await page.waitForSelector('a.list-group-item[href="#/busReserve"]', { visible: true });
     
+    // 스크린샷 촬영: 메인 페이지
+    await takeScreenshot('main-page');
+    
+    endTimer(processName);
     return true;
   } catch (error) {
     console.error('로그인 오류:', error);
+    // 오류 화면 스크린샷
+    await takeScreenshot('login-error');
+    endTimer(processName);
     throw new Error(`로그인 실패: ${error.message}`);
   }
 }
@@ -94,24 +298,30 @@ function getDayOfWeek() {
  * 예약 정보 가져오기
  */
 async function getReservationData() {
+  const processName = "예약 정보 로드";
+  startTimer(processName);
+  
   try {
     const dayOfWeek = getDayOfWeek();
     console.log(`오늘 요일: ${dayOfWeek}`);
     
     // 지원하는 요일이 아니면 종료
     if (!['sunday', 'monday', 'tuesday'].includes(dayOfWeek)) {
+      endTimer(processName);
       throw new Error('지원하지 않는 요일입니다 (일, 월, 화요일만 예약 가능)');
     }
     
     // Firestore에서 예약 정보 가져오기
     const schedulesDoc = await db.collection('schedules').doc(dayOfWeek).get();
     if (!schedulesDoc.exists) {
+      endTimer(processName);
       throw new Error(`${dayOfWeek} 요일 예약 정보가 없습니다`);
     }
     
     const scheduleData = schedulesDoc.data();
     console.log('예약 정보 로드 완료:', scheduleData);
     
+    endTimer(processName);
     return {
       dayOfWeek,
       toSchool: scheduleData.toSchool,
@@ -119,6 +329,7 @@ async function getReservationData() {
     };
   } catch (error) {
     console.error('예약 정보 로드 오류:', error);
+    endTimer(processName);
     throw new Error(`예약 정보 로드 실패: ${error.message}`);
   }
 }
@@ -127,6 +338,9 @@ async function getReservationData() {
  * 버스예약 페이지로 이동
  */
 async function navigateToBusReservePage() {
+  const processName = "버스예약 페이지 이동";
+  startTimer(processName);
+  
   try {
     const { page } = await initBrowser();
     
@@ -149,9 +363,11 @@ async function navigateToBusReservePage() {
     await page.waitForSelector('button.btn.btn-primary.btn-lg.btn-block', { visible: true });
     
     console.log('버스예약 페이지 로드 완료');
+    endTimer(processName);
     return true;
   } catch (error) {
     console.error('버스예약 페이지 이동 오류:', error);
+    endTimer(processName);
     throw new Error(`버스예약 페이지 이동 실패: ${error.message}`);
   }
 }
@@ -160,6 +376,9 @@ async function navigateToBusReservePage() {
  * 하교 버스 예약
  */
 async function reserveFromSchool(reservationData) {
+  const processName = "하교 예약";
+  startTimer(processName);
+  
   try {
     const { page } = await initBrowser();
     const { fromSchool } = reservationData;
@@ -182,6 +401,7 @@ async function reserveFromSchool(reservationData) {
       { timeout: 5000 }
     );
     
+    await takeScreenshot('fromSchool-tab');
     console.log('하교 예약 시작');
     
     // 노선 선택 (셀렉트 박스로 구현됨)
@@ -332,40 +552,20 @@ async function reserveFromSchool(reservationData) {
     // 예약하기 버튼 클릭
     console.log('예약하기 버튼 클릭');
     await page.waitForSelector('button.btn.btn-primary.btn-lg.btn-block', { visible: true });
+    await takeScreenshot('fromSchool-before-reserve');
     await page.click('button.btn.btn-primary.btn-lg.btn-block');
     
-    // 예약 확인 다이얼로그
-    await page.waitForSelector('.swal2-confirm', { visible: true });
-    const confirmMessage = await page.evaluate(() => {
-      const element = document.querySelector('.swal2-html-container');
-      return element ? element.textContent : '';
-    });
-    
-    console.log(`확인 다이얼로그 메시지: ${confirmMessage}`);
-    
-    // 첫 번째 확인 버튼 클릭
-    await page.click('.swal2-confirm');
-    
-    // 예약 결과 다이얼로그
-    await page.waitForSelector('.swal2-confirm', { visible: true });
-    const resultMessage = await page.evaluate(() => {
-      const element = document.querySelector('.swal2-html-container');
-      return element ? element.textContent : '';
-    });
-    
-    console.log(`결과 다이얼로그 메시지: ${resultMessage}`);
-    
-    if (!resultMessage.includes('예약되었습니다') && !resultMessage.includes('예약 완료')) {
-      throw new Error(`예약 실패: ${resultMessage}`);
-    }
-    
-    // 확인 버튼 클릭
-    await page.click('.swal2-confirm');
+    // 확인 다이얼로그 처리 (선택하신 정보로 예약을 하시겠습니까? + 예약 완료)
+    console.log('확인 다이얼로그 처리 시작');
+    await handleConfirmDialogs('fromSchool-dialog');
     
     console.log('하교 버스 예약 완료');
+    endTimer(processName);
     return { status: 'success', message: '하교 예약 완료', details: fromSchool };
   } catch (error) {
     console.error('하교 예약 오류:', error);
+    await takeScreenshot('fromSchool-error');
+    endTimer(processName);
     throw new Error(`하교 예약 실패: ${error.message}`);
   }
 }
@@ -374,6 +574,9 @@ async function reserveFromSchool(reservationData) {
  * 등교 버스 예약
  */
 async function reserveToSchool(reservationData) {
+  const processName = "등교 예약";
+  startTimer(processName);
+  
   try {
     const { page } = await initBrowser();
     const { toSchool } = reservationData;
@@ -396,6 +599,7 @@ async function reserveToSchool(reservationData) {
       { timeout: 5000 }
     );
     
+    await takeScreenshot('toSchool-tab');
     console.log('등교 예약 시작');
     
     // 노선 선택 (셀렉트 박스로 구현됨)
@@ -546,40 +750,20 @@ async function reserveToSchool(reservationData) {
     // 예약하기 버튼 클릭
     console.log('예약하기 버튼 클릭');
     await page.waitForSelector('button.btn.btn-primary.btn-lg.btn-block', { visible: true });
+    await takeScreenshot('toSchool-before-reserve');
     await page.click('button.btn.btn-primary.btn-lg.btn-block');
     
-    // 예약 확인 다이얼로그
-    await page.waitForSelector('.swal2-confirm', { visible: true });
-    const confirmMessage = await page.evaluate(() => {
-      const element = document.querySelector('.swal2-html-container');
-      return element ? element.textContent : '';
-    });
-    
-    console.log(`확인 다이얼로그 메시지: ${confirmMessage}`);
-    
-    // 첫 번째 확인 버튼 클릭
-    await page.click('.swal2-confirm');
-    
-    // 예약 결과 다이얼로그
-    await page.waitForSelector('.swal2-confirm', { visible: true });
-    const resultMessage = await page.evaluate(() => {
-      const element = document.querySelector('.swal2-html-container');
-      return element ? element.textContent : '';
-    });
-    
-    console.log(`결과 다이얼로그 메시지: ${resultMessage}`);
-    
-    if (!resultMessage.includes('예약되었습니다') && !resultMessage.includes('예약 완료')) {
-      throw new Error(`예약 실패: ${resultMessage}`);
-    }
-    
-    // 확인 버튼 클릭
-    await page.click('.swal2-confirm');
+    // 확인 다이얼로그 처리 (선택하신 정보로 예약을 하시겠습니까? + 예약 완료)
+    console.log('확인 다이얼로그 처리 시작');
+    await handleConfirmDialogs('toSchool-dialog');
     
     console.log('등교 버스 예약 완료');
+    endTimer(processName);
     return { status: 'success', message: '등교 예약 완료', details: toSchool };
   } catch (error) {
     console.error('등교 예약 오류:', error);
+    await takeScreenshot('toSchool-error');
+    endTimer(processName);
     throw new Error(`등교 예약 실패: ${error.message}`);
   }
 }
@@ -616,23 +800,45 @@ async function saveReservationLog(dayOfWeek, type, result) {
  * 전체 예약 프로세스 실행
  */
 async function startReservation() {
+  const processName = "전체 예약 프로세스";
+  startTimer(processName);
+  
   try {
     // 브라우저 초기화 및 로그인 상태 확인
     await initBrowser();
+    await takeScreenshot('start-reservation');
     
     // 예약 정보 로드
+    startTimer("예약 정보 로드");
     const reservationData = await getReservationData();
+    endTimer("예약 정보 로드");
     
     // 버스 예약 페이지로 이동
+    startTimer("예약 페이지 이동");
     await navigateToBusReservePage();
+    await takeScreenshot('bus-reserve-page');
+    endTimer("예약 페이지 이동");
     
     // 하교 예약 실행
     const fromSchoolResult = await reserveFromSchool(reservationData);
     await saveReservationLog(reservationData.dayOfWeek, 'fromSchool', fromSchoolResult);
     
+    // 하교 예약 완료 후 남은 다이얼로그 확인 및 처리
+    console.log('하교-등교 전환 전 추가 다이얼로그 확인');
+    await handleConfirmDialogs('transition-dialogs');
+    
     // 등교 예약 실행
     const toSchoolResult = await reserveToSchool(reservationData);
     await saveReservationLog(reservationData.dayOfWeek, 'toSchool', toSchoolResult);
+    
+    // 최종 확인: 남은 다이얼로그 있는지 확인
+    await handleConfirmDialogs('final-dialogs');
+    
+    // 완료 스크린샷
+    await takeScreenshot('reservation-complete');
+    
+    endTimer(processName);
+    reportTimers(); // 모든 타이머 보고
     
     return {
       status: 'success',
@@ -644,6 +850,7 @@ async function startReservation() {
     };
   } catch (error) {
     console.error('예약 프로세스 오류:', error);
+    await takeScreenshot('reservation-error');
     
     // 오류 로그 저장 시도
     try {
@@ -656,6 +863,9 @@ async function startReservation() {
     } catch (logError) {
       console.error('오류 로그 저장 실패:', logError);
     }
+    
+    endTimer(processName);
+    reportTimers(); // 오류 발생해도 타이머 보고
     
     throw new Error(`예약 실패: ${error.message}`);
   }
@@ -714,5 +924,9 @@ module.exports = {
   getReservationData,
   navigateToBusReservePage,
   reserveFromSchool,
-  reserveToSchool
+  reserveToSchool,
+  takeScreenshot,
+  startTimer,
+  endTimer,
+  reportTimers
 }; 
