@@ -1,8 +1,28 @@
 <script setup>
-import { computed, watch } from 'vue';
+import { computed, watch, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from './store/auth';
 import { useReservationStore } from './store/reservations';
+
+const router = useRouter();
+const authStore = useAuthStore();
+
+// 인증 상태 확인
+const isAuthenticated = computed(() => authStore.isAuthenticated);
+const isLoading = ref(false);
+
+// 로그아웃 처리
+const handleLogout = async () => {
+  isLoading.value = true;
+  try {
+    await authStore.logout();
+    router.push('/login');
+  } catch (error) {
+    console.error('로그아웃 실패:', error);
+  } finally {
+    isLoading.value = false;
+  }
+};
 </script>
 
 <template>
@@ -29,6 +49,9 @@ import { useReservationStore } from './store/reservations';
           </router-link>
           <router-link to="/status" class="nav-link">
             예약 현황
+          </router-link>
+          <router-link to="/logs" class="nav-link">
+            로그 확인
           </router-link>
           <button @click="handleLogout" class="btn-logout">
             로그아웃

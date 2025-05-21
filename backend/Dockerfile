@@ -20,6 +20,9 @@ RUN npm install
 # 소스 코드 복사
 COPY . .
 
+# 환경 변수 파일 설정
+COPY .env-template/prod.env .env
+
 # 환경 변수 설정
 ENV PORT=8080
 ENV NODE_ENV=production

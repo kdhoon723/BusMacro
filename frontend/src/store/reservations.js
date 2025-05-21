@@ -10,7 +10,8 @@ import {
   where, 
   orderBy, 
   getDocs, 
-  Timestamp 
+  Timestamp,
+  limit
 } from 'firebase/firestore';
 import { useAuthStore } from './auth';
 
@@ -113,26 +114,52 @@ export const useReservationStore = defineStore('reservations', {
       
       try {
         const authStore = useAuthStore();
-        if (!authStore.userId) {
+        
+        // 인증 상태 확인을 강화
+        if (!authStore.isAuthenticated || !authStore.userId) {
+          console.error('인증 상태 확인:', {
+            isAuthenticated: authStore.isAuthenticated,
+            userId: authStore.userId
+          });
           throw new Error('인증되지 않은 사용자');
         }
+        
+        console.log('예약 설정 로드 시작 - 인증 상태:', 
+          authStore.isAuthenticated, 
+          '사용자 ID:', 
+          authStore.userId
+        );
         
         // 일/월/화요일 예약 설정 로드
         const days = ['sunday', 'monday', 'tuesday'];
         
         for (const day of days) {
-          const scheduleDoc = await getDoc(doc(db, 'schedules', day));
-          
-          if (scheduleDoc.exists()) {
-            this.schedules[day] = scheduleDoc.data();
+          try {
+            const scheduleRef = doc(db, 'schedules', day);
+            const scheduleDoc = await getDoc(scheduleRef);
+            
+            console.log(`${day} 예약 설정 로드:`, scheduleDoc.exists() ? '성공' : '데이터 없음');
+            
+            if (scheduleDoc.exists()) {
+              this.schedules[day] = scheduleDoc.data();
+            }
+          } catch (dayError) {
+            console.error(`${day} 예약 설정 로드 오류:`, dayError);
+            // 개별 날짜 로드 실패 시에도 계속 진행
           }
         }
         
-        // 경로 옵션 로드
-        const routesCollection = collection(db, 'routes');
-        const routesSnapshot = await getDocs(routesCollection);
-        
-        this.availableRoutes = routesSnapshot.docs.map(doc => doc.data());
+        try {
+          // 경로 옵션 로드
+          const routesCollection = collection(db, 'routes');
+          const routesSnapshot = await getDocs(routesCollection);
+          
+          this.availableRoutes = routesSnapshot.docs.map(doc => doc.data());
+          console.log('경로 옵션 로드 완료:', this.availableRoutes.length);
+        } catch (routesError) {
+          console.error('경로 옵션 로드 오류:', routesError);
+          // 경로 옵션 로드 실패 시에도 계속 진행
+        }
         
         return true;
       } catch (error) {
@@ -182,22 +209,16 @@ export const useReservationStore = defineStore('reservations', {
           throw new Error('인증되지 않은 사용자');
         }
         
-        // 최근 30일의 로그 데이터 로드
-        const logsCollection = collection(db, 'logs');
+        console.log('로그 로드 시작 - 인증 상태:', authStore.userId);
         
-        // 30일 전 날짜 계산
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        // recent_logs 컬렉션에서 최근 로그 로드
+        const recentLogsCollection = collection(db, 'recent_logs');
         
-        // 날짜 형식을 YYYYMMDD 문자열로 변환
-        const dateString = thirtyDaysAgo.getFullYear() +
-          String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0') +
-          String(thirtyDaysAgo.getDate()).padStart(2, '0');
-        
-        // 날짜를 기준으로 정렬된 쿼리
+        // 최근 로그 가져오기
         const logsQuery = query(
-          logsCollection,
-          orderBy('date', 'desc')
+          recentLogsCollection,
+          orderBy('timestamp', 'desc'),
+          limit(30)
         );
         
         const logsSnapshot = await getDocs(logsQuery);
@@ -205,10 +226,14 @@ export const useReservationStore = defineStore('reservations', {
         // 로그 데이터 변환
         this.logs = logsSnapshot.docs.map(doc => {
           const data = doc.data();
+          
           return {
             id: doc.id,
-            date: data.date,
-            ...data
+            timestamp: data.timestamp ? new Date(data.timestamp) : new Date(),
+            status: data.context?.type === 'reservation' ? 
+                   (data.context.result?.status || 'unknown') : 
+                   (data.level === 'error' ? 'error' : 'success'),
+            message: data.message || '로그 메시지 없음'
           };
         });
         

@@ -6,6 +6,7 @@ import Login from '../views/Login.vue';
 import Dashboard from '../views/Dashboard.vue';
 import ReservationSettings from '../views/ReservationSettings.vue';
 import ReservationStatus from '../views/ReservationStatus.vue';
+import LogViewer from '../views/LogViewer.vue';
 import NotFound from '../views/NotFound.vue';
 
 const routes = [
@@ -35,6 +36,12 @@ const routes = [
     path: '/status',
     name: 'ReservationStatus',
     component: ReservationStatus,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/logs',
+    name: 'LogViewer',
+    component: LogViewer,
     meta: { requiresAuth: true }
   },
   {

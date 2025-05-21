@@ -6,37 +6,72 @@ const admin = require('firebase-admin');
 const { db } = require('../firebase/init');
 const busReservation = require('../services/busReservation');
 
+// 명령줄 인수 파싱
+const args = process.argv.slice(2);
+const TEST_DAY = args.find(arg => arg.startsWith('--day='))?.split('=')[1] || 'sunday';
+const CUSTOM_ROUTE = args.find(arg => arg.startsWith('--route='))?.split('=')[1] || process.env.CUSTOM_ROUTE || '노원';
+const CUSTOM_TO_SCHOOL_TIME = args.find(arg => arg.startsWith('--toSchoolTime='))?.split('=')[1] || process.env.CUSTOM_TO_SCHOOL_TIME || '11:00';
+const CUSTOM_FROM_SCHOOL_TIME = args.find(arg => arg.startsWith('--fromSchoolTime='))?.split('=')[1] || process.env.CUSTOM_FROM_SCHOOL_TIME || '13:15';
+const CUSTOM_STATION = args.find(arg => arg.startsWith('--station='))?.split('=')[1] || process.env.CUSTOM_STATION || '노원역';
+
 /**
  * 예약 설정 데이터 직접 지정
  */
 const TEST_RESERVATION_DATA = {
-  dayOfWeek: 'sunday', // 일요일 예약 테스트 (실행하는 요일에 맞게 변경 필요)
+  dayOfWeek: TEST_DAY, // 테스트 요일 (기본값: 일요일)
   toSchool: {
     enabled: true,
-    route: '장기/대화',
-    time: '07:40',
-    station: '대화역',
+    route: CUSTOM_ROUTE,
+    time: CUSTOM_TO_SCHOOL_TIME,
+    station: CUSTOM_STATION,
     seatNumber: 11
   },
   fromSchool: {
     enabled: true,
-    route: '대화A',
-    time: '15:45',
-    station: '대화역',
+    route: CUSTOM_ROUTE,
+    time: CUSTOM_FROM_SCHOOL_TIME,
+    station: CUSTOM_STATION,
     seatNumber: 11
   }
 };
+
+/**
+ * 테스트 데이터를 Firestore에 저장
+ */
+async function saveTestDataToFirestore() {
+  try {
+    // Firestore에 테스트 데이터 저장
+    await db.collection('schedules').doc(TEST_DAY).set({
+      toSchool: TEST_RESERVATION_DATA.toSchool,
+      fromSchool: TEST_RESERVATION_DATA.fromSchool
+    });
+    
+    console.log(`테스트 데이터가 Firestore에 저장됨 (${TEST_DAY})`);
+    return TEST_RESERVATION_DATA;
+  } catch (error) {
+    console.error('테스트 데이터 저장 오류:', error);
+    throw error;
+  }
+}
 
 /**
  * 예약 테스트 함수
  */
 async function testReservation() {
   console.log('---------- 예약 프로세스 테스트 시작 ----------');
+  console.log('테스트 설정:');
+  console.log(`- 요일: ${TEST_RESERVATION_DATA.dayOfWeek}`);
+  console.log(`- 노선: ${TEST_RESERVATION_DATA.toSchool.route}(등교), ${TEST_RESERVATION_DATA.fromSchool.route}(하교)`);
+  console.log(`- 시간: ${TEST_RESERVATION_DATA.toSchool.time}(등교), ${TEST_RESERVATION_DATA.fromSchool.time}(하교)`);
+  console.log(`- 정류장: ${TEST_RESERVATION_DATA.toSchool.station}`);
   
   // 전체 테스트 과정 시간 측정 시작
   busReservation.startTimer('전체 테스트 과정');
   
   try {
+    // 0. 테스트 데이터 Firestore에 저장
+    await saveTestDataToFirestore();
+    
     // 1. 로그인 테스트
     console.log('\n[1단계] 로그인 테스트');
     busReservation.startTimer('로그인 테스트');
@@ -44,30 +79,16 @@ async function testReservation() {
     busReservation.endTimer('로그인 테스트');
     console.log('로그인 테스트 성공!\n');
     
-    // 2. 예약 프로세스 테스트 (Firebase 데이터 대신 테스트 데이터 직접 사용)
+    // 2. 예약 프로세스 테스트
     console.log('[2단계] 예약 프로세스 테스트');
     
-    // 원본 함수 백업
-    const originalGetReservationData = busReservation.getReservationData;
+    // 테스트 모드로 예약 프로세스 실행 (요일 제한 무시)
+    busReservation.startTimer('예약 프로세스 실행');
+    const result = await busReservation.startReservation(true);
+    busReservation.endTimer('예약 프로세스 실행');
     
-    // getReservationData 함수 모킹 (테스트 데이터 반환)
-    busReservation.getReservationData = async () => {
-      console.log('테스트 예약 데이터 사용:', TEST_RESERVATION_DATA);
-      return TEST_RESERVATION_DATA;
-    };
-    
-    try {
-      // 전체 예약 프로세스 실행
-      busReservation.startTimer('예약 프로세스 실행');
-      const result = await busReservation.startReservation();
-      busReservation.endTimer('예약 프로세스 실행');
-      
-      console.log('\n예약 프로세스 테스트 결과:', result);
-      console.log('예약 테스트 성공!');
-    } finally {
-      // 원본 함수 복원
-      busReservation.getReservationData = originalGetReservationData;
-    }
+    console.log('\n예약 프로세스 테스트 결과:', result);
+    console.log('예약 테스트 성공!');
     
   } catch (error) {
     console.error('테스트 실패:', error);

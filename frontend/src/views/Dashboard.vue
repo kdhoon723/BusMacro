@@ -3,6 +3,15 @@
   <div class="dashboard-container container">
     <h1 class="dashboard-title">대시보드</h1>
     
+    <!-- 인증 오류 메시지 -->
+    <div v-if="authError" class="alert alert-error">
+      <p>인증에 문제가 발생했습니다. 다시 로그인해주세요.</p>
+      <div class="alert-actions">
+        <button @click="retryLoading" class="btn-retry">다시 시도</button>
+        <button @click="goToLogin" class="btn-login">로그인 페이지</button>
+      </div>
+    </div>
+    
     <!-- 다음 예약 카운트다운 -->
     <div class="card next-reservation">
       <h2>다음 예약</h2>
@@ -109,7 +118,10 @@
           </div>
         </div>
       </div>
-      <router-link to="/status" class="btn-link">전체 로그 보기</router-link>
+      <div class="log-links">
+        <router-link to="/status" class="btn-link">전체 로그 보기</router-link>
+        <router-link to="/logs" class="btn-link detail-link">세부 로그 확인</router-link>
+      </div>
     </div>
   </div>
 </template>
@@ -117,13 +129,16 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useReservationStore } from '../store/reservations';
+import { useRouter } from 'vue-router';
 
 // 스토어 설정
 const reservationStore = useReservationStore();
+const router = useRouter();
 
 // 상태 관리
 const countdownInterval = ref(null);
 const countdown = ref({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+const authError = ref(false);
 
 // 다음 예약 정보
 const nextReservation = computed(() => {
@@ -142,7 +157,22 @@ const logs = computed(() => reservationStore.getRecentLogs);
 const formatDate = (dateString) => {
   if (!dateString) return '';
   
-  const date = new Date(dateString);
+  let date;
+  if (dateString instanceof Date) {
+    date = dateString;
+  } else {
+    try {
+      date = new Date(dateString);
+    } catch (error) {
+      console.error('날짜 변환 오류:', error);
+      return '날짜 형식 오류';
+    }
+  }
+  
+  if (isNaN(date.getTime())) {
+    return '유효하지 않은 날짜';
+  }
+  
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -176,20 +206,63 @@ const updateCountdown = () => {
   countdown.value = { days, hours, minutes, seconds };
 };
 
+// 다시 시도 함수
+function retryLoading() {
+  authError.value = false;
+  loadDashboardData();
+}
+
+// 로그인 페이지로 이동
+function goToLogin() {
+  router.push('/login');
+}
+
+// 대시보드 데이터 로드
+async function loadDashboardData() {
+  try {
+    // 예약 설정 로드
+    const scheduleResult = await reservationStore.loadSchedules();
+    if (!scheduleResult) {
+      console.error('예약 설정 로드 실패');
+      
+      // 인증 오류 확인
+      if (reservationStore.error && reservationStore.error.includes('인증')) {
+        authError.value = true;
+        return;
+      }
+    }
+    
+    // 로그 데이터 로드
+    const logResult = await reservationStore.loadLogs();
+    if (!logResult) {
+      console.error('로그 로드 실패');
+      
+      // 인증 오류 확인
+      if (reservationStore.error && reservationStore.error.includes('인증')) {
+        authError.value = true;
+        return;
+      }
+    }
+    
+    // 다음 예약 계산
+    reservationStore.calculateNextReservation();
+    
+    // 카운트다운 시작
+    updateCountdown();
+    countdownInterval.value = setInterval(updateCountdown, 1000);
+  } catch (error) {
+    console.error('대시보드 데이터 로드 오류:', error);
+    
+    // 인증 오류 확인
+    if (error.message && error.message.includes('인증')) {
+      authError.value = true;
+    }
+  }
+}
+
 // 컴포넌트 마운트 시 데이터 로드
 onMounted(async () => {
-  // 예약 설정 로드
-  await reservationStore.loadSchedules();
-  
-  // 로그 데이터 로드
-  await reservationStore.loadLogs();
-  
-  // 다음 예약 계산
-  reservationStore.calculateNextReservation();
-  
-  // 카운트다운 시작
-  updateCountdown();
-  countdownInterval.value = setInterval(updateCountdown, 1000);
+  loadDashboardData();
 });
 
 // 컴포넌트 언마운트 시 인터벌 정리
@@ -346,13 +419,13 @@ onMounted(() => {
 }
 
 .log-item {
-  padding: 10px 0;
+  padding: 10px;
   border-bottom: 1px solid #eee;
 }
 
 .log-date {
   font-size: 0.8rem;
-  color: #666;
+  color: #777;
   margin-bottom: 5px;
 }
 
@@ -362,21 +435,16 @@ onMounted(() => {
 }
 
 .log-status {
-  padding: 3px 6px;
-  border-radius: 4px;
-  font-size: 0.8rem;
   font-weight: bold;
   margin-right: 10px;
 }
 
 .log-status.success {
-  background-color: var(--secondary-color);
-  color: white;
+  color: var(--secondary-color);
 }
 
 .log-status.error {
-  background-color: var(--danger-color);
-  color: white;
+  color: var(--danger-color);
 }
 
 .log-message {
@@ -389,20 +457,74 @@ onMounted(() => {
   color: #666;
 }
 
+/* 알림 스타일 */
+.alert {
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.alert-error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.alert-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.btn-retry, .btn-login {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.btn-retry {
+  background-color: #17a2b8;
+  color: white;
+}
+
+.btn-login {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-retry:hover {
+  background-color: #138496;
+}
+
+.btn-login:hover {
+  background-color: #0069d9;
+}
+
 /* 버튼 링크 */
+.log-links {
+  display: flex;
+  gap: 15px;
+  margin-top: 20px;
+}
+
 .btn-link {
   display: inline-block;
-  margin-top: 20px;
-  padding: 8px 16px;
-  background-color: var(--primary-color);
-  color: white;
+  margin-top: 10px;
+  color: var(--primary-color);
   text-decoration: none;
-  border-radius: 4px;
-  transition: background-color 0.3s;
+  font-weight: bold;
+}
+
+.detail-link {
+  color: var(--secondary-color);
 }
 
 .btn-link:hover {
-  background-color: #2980b9;
+  text-decoration: underline;
 }
 
 /* 반응형 */

@@ -204,3 +204,106 @@
   }
 }
 ```
+
+## 로컬 테스트 방법
+
+### 환경 변수 설정
+
+`.env` 파일에 다음과 같은 환경 변수를 설정할 수 있습니다:
+
+```
+# 테스트 모드 활성화 (요일 제한 무시)
+TEST_MODE=true
+
+# 커스텀 노선 및 시간 설정
+CUSTOM_ROUTE=노원
+CUSTOM_TO_SCHOOL_TIME=08:10
+CUSTOM_FROM_SCHOOL_TIME=15:30
+CUSTOM_STATION=노원역
+```
+
+### 테스트 스크립트 실행
+
+#### npm 명령어로 테스트 실행하기
+
+```bash
+# 요일 제한 없이 테스트
+npm run test:all-days
+
+# 특정 요일 테스트
+npm run test:wednesday  # 수요일 테스트
+npm run test:thursday   # 목요일 테스트
+npm run test:friday     # 금요일 테스트
+npm run test:saturday   # 토요일 테스트
+
+# 10시(22시) 예약 대기 테스트 (테스트 모드)
+npm run test:wait10pm
+
+# 정확한 시간 지정 예약 테스트 (현재 시간 + 1분으로 설정)
+npm run test:time
+
+# 정확한 시간을 직접 지정하여 예약 테스트 (HH:MM:SS 형식)
+npm run test:time-exact 13:45:00
+
+# 커스텀 파라미터로 테스트
+npm run test:custom -- --day=wednesday --route=장기/대화 --toSchoolTime=07:40 --fromSchoolTime=15:45 --station=대화역
+```
+
+#### node 명령어로 직접 실행하기
+
+```bash
+# 10시 예약 테스트
+
+# 테스트 모드로 22시(10PM) 예약 대기 스크립트 실행
+node backend/src/test/wait-and-reserve-10pm.js --test
+
+# 또는 환경변수를 직접 지정
+TEST_MODE=true CUSTOM_ROUTE=장기/대화 CUSTOM_TO_SCHOOL_TIME=07:40 CUSTOM_FROM_SCHOOL_TIME=15:45 CUSTOM_STATION=대화역 node backend/src/test/wait-and-reserve-10pm.js
+```
+
+```bash
+# 즉시 예약 테스트
+
+# 특정 요일과 노선/시간으로 바로 예약 테스트
+node backend/src/test/reserve-test.js --day=wednesday --route=장기/대화 --toSchoolTime=07:40 --fromSchoolTime=15:45 --station=대화역
+
+# 기본 설정으로 테스트
+node backend/src/test/reserve-test.js
+```
+
+```bash
+# 정확한 시간에 예약 테스트
+
+# 정확한 시간(13:45:00)에 예약 시작
+node backend/src/test/wait-and-reserve-custom.js --test --start-time=13:45:00
+
+# 특정 요일도 함께 지정
+node backend/src/test/wait-and-reserve-custom.js --test --day=wednesday --start-time=13:45:00
+```
+
+### 테스트 매개변수
+
+#### 요일 지정
+- `--day=요일` : sunday, monday, tuesday, wednesday, thursday, friday, saturday 중 하나 선택 (기본값: sunday)
+
+#### 노선 및 시간 지정
+- `--route=노선명` : 노선 이름 (예: 노원, 장기/대화, 대화A 등)
+- `--toSchoolTime=시간` : 등교 시간 (HH:MM 형식, 예: 08:10)
+- `--fromSchoolTime=시간` : 하교 시간 (HH:MM 형식, 예: 15:30)
+- `--station=정류장` : 정류장 이름 (예: 노원역, 대화역 등)
+
+#### 정확한 예약 시작 시간 지정
+- `--start-time=시간` : 예약 시작 시간 (HH:MM:SS 형식, 예: 13:45:00)
+  - 지정하지 않으면 현재 시간 + 1분으로 설정됨
+  - 지정한 시간이 이미 지났으면 즉시 예약 시작
+
+### 정확한 시간 예약 테스트 시 특징
+- 로그인 후 지정한 정확한 시간까지 대기
+- 10초 이내 시간은 500ms 단위로 시간을 확인하여 정밀한 시간 체크
+- 예약 시작 시간을 밀리초 단위까지 출력하여 정확한 시간 확인 가능
+
+## 주의사항
+
+- 테스트 모드에서는 요일 제한(일/월/화요일만 가능)이 무시됩니다.
+- 실제 버스 예약 시간과 노선/정류장이 실제 존재하는지 확인해야 합니다.
+- 로그인 정보는 `.env` 파일에 설정해야 합니다.

@@ -9,7 +9,17 @@
     "test:login": "node src/test/login-test.js",
     "test:reserve": "node src/test/reserve-test.js",
     "reserve:wait9pm": "node src/test/wait-and-reserve.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "reserve:wait10pm": "node src/test/wait-and-reserve-10pm.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:all-days": "node src/test/reserve-test.js --test",
+    "test:custom": "node src/test/reserve-test.js",
+    "test:wednesday": "node src/test/reserve-test.js --day=wednesday",
+    "test:thursday": "node src/test/reserve-test.js --day=thursday",
+    "test:friday": "node src/test/reserve-test.js --day=friday",
+    "test:saturday": "node src/test/reserve-test.js --day=saturday",
+    "test:wait10pm": "node src/test/wait-and-reserve-10pm.js --test",
+    "test:time": "node src/test/wait-and-reserve-custom.js --test",
+    "test:time-exact": "node src/test/wait-and-reserve-custom.js --test --start-time="
   },
   "keywords": [
     "puppeteer",
