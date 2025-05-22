@@ -1,0 +1,31 @@
+{
+  "name": "backend-api",
+  "version": "1.0.0",
+  "description": "대진대 버스 예약 자동화 API 버전",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test:login": "node src/test/login-test.js",
+    "test:reserve": "node src/test/reserve-test.js",
+    "test:time": "node src/test/time-test.js"
+  },
+  "keywords": [
+    "api",
+    "automation",
+    "bus",
+    "reservation"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1",
+    "tough-cookie": "^4.1.3",
+    "axios-cookiejar-support": "^4.0.7",
+    "node-cron": "^3.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
