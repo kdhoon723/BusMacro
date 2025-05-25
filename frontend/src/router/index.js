@@ -7,6 +7,7 @@ import Dashboard from '../views/Dashboard.vue';
 import ReservationSettings from '../views/ReservationSettings.vue';
 import ReservationStatus from '../views/ReservationStatus.vue';
 import LogViewer from '../views/LogViewer.vue';
+import WeeklySchedule from '../views/WeeklySchedule.vue';
 import NotFound from '../views/NotFound.vue';
 
 const routes = [
@@ -30,6 +31,12 @@ const routes = [
     path: '/settings',
     name: 'ReservationSettings',
     component: ReservationSettings,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/weekly',
+    name: 'WeeklySchedule',
+    component: WeeklySchedule,
     meta: { requiresAuth: true }
   },
   {

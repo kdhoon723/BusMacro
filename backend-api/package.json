@@ -8,7 +8,15 @@
     "dev": "nodemon src/index.js",
     "test:login": "node src/test/login-test.js",
     "test:reserve": "node src/test/reserve-test.js",
-    "test:time": "node src/test/time-test.js"
+    "test:time": "node src/test/time-test.js",
+    "test:enhanced": "node src/test/enhanced-time-test.js",
+    "test:dual": "node src/test/dual-reservation-test.js",
+    "collect:data": "node src/test/data-collector.js",
+    "test:data": "node src/test/quick-data-test.js",
+    "upload:firebase": "node src/test/firebase-uploader.js",
+    "sync:firebase": "node src/test/firebase-uploader.js --batch",
+    "upload:firestore": "node src/test/firestore-uploader.js",
+    "sync:firestore": "node src/test/firestore-uploader.js"
   },
   "keywords": [
     "api",
@@ -20,10 +28,11 @@
   "license": "ISC",
   "dependencies": {
     "axios": "^1.6.2",
-    "dotenv": "^16.3.1",
-    "tough-cookie": "^4.1.3",
     "axios-cookiejar-support": "^4.0.7",
-    "node-cron": "^3.0.2"
+    "dotenv": "^16.3.1",
+    "firebase-admin": "^13.4.0",
+    "node-cron": "^3.0.2",
+    "tough-cookie": "^4.1.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

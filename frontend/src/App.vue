@@ -47,6 +47,9 @@ const handleLogout = async () => {
           <router-link to="/settings" class="nav-link">
             예약 설정
           </router-link>
+          <router-link to="/weekly" class="nav-link">
+            주간 스케줄
+          </router-link>
           <router-link to="/status" class="nav-link">
             예약 현황
           </router-link>

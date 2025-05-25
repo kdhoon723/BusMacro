@@ -13,8 +13,12 @@
   },
   "main": "index.js",
   "dependencies": {
+    "axios": "^1.9.0",
+    "axios-cookiejar-support": "^6.0.2",
     "firebase-admin": "^12.6.0",
-    "firebase-functions": "^6.0.1"
+    "firebase-functions": "^6.0.1",
+    "node-cron": "^4.0.7",
+    "tough-cookie": "^5.1.2"
   },
   "devDependencies": {
     "firebase-functions-test": "^3.1.0"

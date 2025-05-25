@@ -98,14 +98,76 @@ select, input {
   border-radius: 4px;
   font-size: 16px;
   background-color: white;
+  color: #333;
   width: 100%;
   box-sizing: border-box;
+  /* 브라우저 기본 스타일 제거 */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+select {
+  /* 화살표 추가 */
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  padding-right: 40px;
 }
 
 select:focus, input:focus {
   border-color: var(--primary-color);
   outline: none;
   box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+/* 셀렉트 옵션 스타일 개선 - 더 강력한 스타일 적용 */
+select option {
+  background-color: white !important;
+  color: #333 !important;
+  padding: 12px !important;
+  font-size: 14px !important;
+  border: none !important;
+  font-family: inherit !important;
+}
+
+/* 빈 옵션 (placeholder) */
+select option[value=""] {
+  color: #999 !important;
+  font-style: italic !important;
+}
+
+select option:hover {
+  background-color: #f0f8ff !important;
+  color: #333 !important;
+}
+
+select option:checked,
+select option:selected {
+  background-color: var(--primary-color) !important;
+  color: white !important;
+}
+
+/* 특별 옵션 (노원 노선) - 더 강력한 스타일 */
+select option.special-route {
+  background-color: #e8f5e8 !important;
+  color: #2d5a2d !important;
+  font-weight: bold !important;
+}
+
+/* Firefox 전용 스타일 */
+@-moz-document url-prefix() {
+  select option {
+    background-color: white;
+    color: #333;
+  }
+  
+  select option.special-route {
+    background-color: #e8f5e8;
+    color: #2d5a2d;
+    font-weight: bold;
+  }
 }
 
 /* 모달 및 드롭다운 스타일 */

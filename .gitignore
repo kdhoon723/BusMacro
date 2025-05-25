@@ -79,3 +79,8 @@ credentials.json
 .DS_Store
 Thumbs.db
 desktop.ini 
+
+djbusmacro-firebase-adminsdk-fbsvc-c0fa9208a3.json
+
+bus-data*
+firebase-data*
